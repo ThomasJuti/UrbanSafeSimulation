@@ -2,7 +2,7 @@
 
 Actividad 9, Ingeniería Aplicada. **Resultados = estimaciones del modelo, no mediciones reales.**
 
-- Enlace de la app desplegada (Vercel): _pendiente: agregar la URL al desplegar_
+- Enlace de la app desplegada (Vercel): https://urbansafe-simulation.vercel.app
 - Código: `/Users/thomasjutinico/Documents/UrbanSafe/Simulation`
 
 ## 1. Qué es y qué problema resuelve

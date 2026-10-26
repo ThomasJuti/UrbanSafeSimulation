@@ -2,6 +2,8 @@
 
 App web (Astro 5 + islas React + TypeScript estricto) de la Actividad 9, Ingeniería Aplicada. Compara cuatro arquitecturas para UrbanSafe con un modelo de colas calibrado con las mediciones de `UrbanSafeApp/docs/spec.md`. Los resultados son estimaciones del modelo, no mediciones reales.
 
+**App desplegada:** https://urbansafe-simulation.vercel.app
+
 ## Comandos
 
 ```bash
