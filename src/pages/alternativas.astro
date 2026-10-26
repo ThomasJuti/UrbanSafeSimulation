@@ -1,0 +1,7 @@
+---
+import Base from '../layouts/Base.astro';
+import AlternativesView from '../components/AlternativesView';
+---
+<Base titulo="Alternativas" descripcion="Cuatro arquitecturas candidatas para UrbanSafe, con sus ventajas, limitaciones y los parámetros del modelo que las distinguen.">
+  <AlternativesView client:only="react" />
+</Base>
