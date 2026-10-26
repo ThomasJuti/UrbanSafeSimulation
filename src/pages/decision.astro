@@ -1,0 +1,7 @@
+---
+import Base from '../layouts/Base.astro';
+import DecisionView from '../components/DecisionView';
+---
+<Base titulo="Decisión" descripcion="Filtro de requisitos obligatorios, puntaje ponderado con pesos editables y una recomendación explicada a partir de los números del modelo.">
+  <DecisionView client:only="react" />
+</Base>
