@@ -1,0 +1,7 @@
+---
+import Base from '../layouts/Base.astro';
+import TestRunner from '../components/TestRunner';
+---
+<Base titulo="Pruebas" descripcion="Las 12 pruebas del modelo corren aquí, en el navegador, y una demo de validación de entradas inválidas.">
+  <TestRunner client:only="react" />
+</Base>
