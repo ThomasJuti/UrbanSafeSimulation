@@ -1,0 +1,7 @@
+---
+import Base from '../layouts/Base.astro';
+import ProjectForm from '../components/ProjectForm';
+---
+<Base titulo="Proyecto" descripcion="Ficha de UrbanSafe, usuarios previstos, requisitos de calidad, requisitos obligatorios y restricciones. Todo es editable y se guarda en este navegador.">
+  <ProjectForm client:only="react" />
+</Base>
