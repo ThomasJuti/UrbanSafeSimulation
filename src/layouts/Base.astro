@@ -1,0 +1,75 @@
+---
+import '../styles/global.css';
+import Datos from '../components/Datos';
+
+interface Props {
+  titulo: string;
+  descripcion?: string;
+}
+const { titulo, descripcion = '' } = Astro.props;
+const actual = Astro.url.pathname.replace(/\/$/, '') || '/';
+const enlaces = [
+  { href: '/', texto: 'Proyecto' },
+  { href: '/alternativas', texto: 'Alternativas' },
+  { href: '/escenarios', texto: 'Escenarios' },
+  { href: '/resultados', texto: 'Resultados' },
+  { href: '/decision', texto: 'Decisión' },
+  { href: '/modelo', texto: 'Modelo' },
+  { href: '/pruebas', texto: 'Pruebas' },
+];
+---
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{titulo} · Simulador UrbanSafe</title>
+    <meta name="description" content={descripcion} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <a class="skip" href="#contenido">Saltar al contenido</a>
+    <header class="site-header">
+      <div class="bar">
+        <a class="brand" href="/" aria-label="UrbanSafe Simulador, inicio">
+          <img src="/logo.png" alt="" width="28" height="28" />
+          <span class="word">UrbanSafe</span>
+          <span class="tagline">Simulador</span>
+        </a>
+        <button class="nav-toggle no-print" id="nav-toggle" aria-expanded="false" aria-controls="nav">Menú</button>
+        <nav class="nav" id="nav" aria-label="Secciones">
+          {enlaces.map((l) => (
+            <a href={l.href} aria-current={actual === l.href ? 'page' : undefined}>{l.texto}</a>
+          ))}
+        </nav>
+        <div class="tools no-print">
+          <Datos client:only="react" />
+        </div>
+      </div>
+    </header>
+    <main id="contenido">
+      <div class="page-head">
+        <h1>{titulo}</h1>
+        {descripcion && <p>{descripcion}</p>}
+      </div>
+      <slot />
+    </main>
+    <footer class="site-footer">
+      <a class="brand" href="/"><img src="/logo.png" alt="" width="24" height="24" /><span class="word">UrbanSafe</span></a>
+      <p>Simulador de arquitecturas · Actividad 9, Ingeniería Aplicada. Resultados = estimaciones del modelo, no mediciones reales.</p>
+    </footer>
+    <script is:inline>
+      (function () {
+        var b = document.getElementById('nav-toggle');
+        var n = document.getElementById('nav');
+        if (b && n) b.addEventListener('click', function () {
+          var o = n.classList.toggle('open');
+          b.setAttribute('aria-expanded', String(o));
+        });
+      })();
+    </script>
+  </body>
+</html>
