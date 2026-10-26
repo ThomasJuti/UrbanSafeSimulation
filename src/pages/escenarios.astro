@@ -1,0 +1,7 @@
+---
+import Base from '../layouts/Base.astro';
+import ScenarioEditor from '../components/ScenarioEditor';
+---
+<Base titulo="Escenarios" descripcion="Cree, duplique y edite escenarios con las 14 variables de entrada. La demanda derivada se calcula en vivo y se resalta lo que cambió frente a la referencia.">
+  <ScenarioEditor client:only="react" />
+</Base>
