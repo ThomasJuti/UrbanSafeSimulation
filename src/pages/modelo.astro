@@ -1,0 +1,146 @@
+---
+import Base from '../layouts/Base.astro';
+import { PARAMS } from '../lib/model/params';
+import { LISTA_ALTERNATIVAS } from '../lib/model/alternatives';
+import { VARIABLES } from '../lib/model/variables';
+import { ENTRADAS_REFERENCIA } from '../lib/model/scenarios';
+import { REFERENCIAS, REF_SPEC, ETIQUETA_REF } from '../lib/model/references';
+import type { Param } from '../lib/model/types';
+
+const claseRef = (r: string) => (r === 'spec' ? 'medido' : r === 'supuesto' ? 'supuesto' : r === 'conv' ? 'convencion' : 'literatura');
+
+const nf = (x: number) => x.toLocaleString('es-CO', { maximumFractionDigits: 4 });
+const eqs = [
+  ['Demanda', 'λ_ruta = usuarios / intervalo × ráfaga\nλ_rep  = usuarios × reportes_por_hora / 3600 × ráfaga\nλ_pos  = usuarios × 1 posición/s'],
+  ['Servicio en la aplicación', 'S_app = base × overhead_a + saltos × (c_serialización + c_TLS·[mTLS])'],
+  ['Servicio en la base', 'S_bd,ruta = 3 rutas × t_ruta\nS_bd,rep  = CPU del insert'],
+  ['Capacidad efectiva (Ley de Escalabilidad Universal)', 'C(N)   = N / (1 + σ(N−1) + κN(N−1))\nc_eff  = vCPU_nodo × (1 − overhead_plataforma) × C(N)\nN*     = √((1−σ)/κ)       A1 fija N = 1'],
+  ['Utilización', 'ρ = Σ λ_i·S_i / c_eff       (aplicación, base y lock de reportes)'],
+  ['Espera (Sakasegawa + Allen-Cunneen)', 'P_w ≈ ρ^(√(2(c+1)) − 1)\nW_q ≈ S · ρ^(√(2(c+1)) − 1) / (c(1−ρ)) · (1+cv²)/2\nP(W_q > t) = P_w · e^(−θ t),  θ = (cμ−λ) · 2/(1+cv²)\nW_q,95 = ln(P_w / 0,05) / θ'],
+  ['Saturación (ρ ≥ 1)', 'W_q = cola_máx · S / c        (ROUTING_MAX_QUEUE = 30; reportes: cola = usuarios)\nthroughput = c / S\nrechazo = 1 − 1/ρ                (la cola de ruteo responde 503)'],
+  ['Lock de reportes', 'Cola M/M/c_lock, S_lock = 120 ms; c_lock = 1 (A1-A3) o particiones (A4)'],
+  ['Latencia', 'p95_ruteo = latencia × viajes + saltos·t_salto + S_app + W_q95,app + S_bd·(1 + z95·cv) + W_q95,bd\np95_reporte = latencia × 1 + saltos·t_salto + S_app + W_q95,app + S_lock + W_q95,lock'],
+  ['Disponibilidad', 'rep(a, r) = 1 − (1−a)^r\nA1 = a · A_bd\nA2 ruteo   = A_lb · rep(a,N) · rep(A_bd,2)\nA2 reporte = A_lb · rep(a,N) · A_redis · A_bd\nA3 ruteo   = rep(a,N)^2 · A_ctrl · A_bd;  reporte = rep(a,N)^4 · A_ctrl · A_bd\nA4 ruteo   = rep(a,N)^2 · A_bd;  reporte = rep(a,N) · A_broker · rep(a,N) · A_bd\nCaída/mes = (1−A) · 43 200 min'],
+  ['Costo', 'costo = N·costo_nodo + vCPU_bd·(1+réplicas)·costo_vCPU + extras (LB, Redis, plano de control o broker)'],
+  ['Seguridad', 'cobertura = (canales_externos + internos·[mTLS]) / canales_totales\nseguridad = 100 · (w·cobertura + (1−w)·(1 − internos/ref))'],
+  ['Escalabilidad', 'C(2N)/C(N)  y  N* = √((1−σ)/κ)'],
+];
+---
+<Base titulo="Modelo" descripcion="Ecuaciones, parámetros con su fuente, supuestos, limitaciones y los datos que harían falta para validar el modelo en un entorno real.">
+  <div class="aviso-modelo" role="note">Resultados = estimaciones del modelo, no mediciones reales</div>
+
+  <section class="doc-section card">
+    <h2>Estructura del modelo</h2>
+    <p><strong>Métodos:</strong> modelo de colas M/M/c y M/G/c; aproximación de Sakasegawa para la espera; Ley de Escalabilidad Universal (USL) para el efecto de agregar nodos. Los valores de los parámetros y las afirmaciones cualitativas se apoyan en los artículos del curso [1]–[4] y en la spec de UrbanSafe; lo que no tiene respaldo se rotula como supuesto del equipo.</p>
+    <p>Modelo de colas de dos niveles (aplicación y base de datos) con tres clases de carga propias de UrbanSafe: <strong>ruteo</strong>, <strong>reporte</strong> y <strong>posición/alerta</strong>. Los reportes pasan además por una cola serializada por el advisory lock global. Se calibra con las mediciones de <code>docs/spec.md</code>: ruteo en la base de 80 a 280 ms; carga sostenida de 30 usuarios con p50 474 ms y p95 1 380 ms; ráfaga con p95 de 3,5 a 10,6 s; reportes serializados con p95 de 3,6 s.</p>
+  </section>
+
+  <section class="doc-section">
+    <h2>Ecuaciones</h2>
+    {eqs.map(([t, e]) => (
+      <div>
+        <h3>{t}</h3>
+        <div class="eq">{e}</div>
+      </div>
+    ))}
+  </section>
+
+  <section class="doc-section">
+    <h2>Variables de entrada (14)</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Variable</th><th>Unidad</th><th>Rango</th><th class="num">Referencia</th><th>Justificación</th></tr></thead>
+      <tbody>
+        {VARIABLES.map((v) => (
+          <tr><td>{v.etiqueta}</td><td>{v.unidad}</td><td>{v.clave === 'mtls' ? 'sí/no' : `${v.min} – ${v.max}`}</td><td class="num">{typeof ENTRADAS_REFERENCIA[v.clave] === 'boolean' ? (ENTRADAS_REFERENCIA[v.clave] ? 'sí' : 'no') : nf(ENTRADAS_REFERENCIA[v.clave] as number)}</td><td>{v.justificacion}</td></tr>
+        ))}
+      </tbody>
+    </table></div>
+  </section>
+
+  <section class="doc-section">
+    <h2>Parámetros globales y su fuente</h2>
+    <p class="muted">Cada parámetro vive en <code>src/lib/model/params.ts</code> y declara su fuente con una clave: <span class="tag medido">spec</span> medido en UrbanSafe; <span class="tag literatura">[1]</span> a <span class="tag literatura">[4]</span> valor tomado o calibrado de un artículo del curso; <span class="tag supuesto">supuesto</span> decisión del equipo a validar (puede llevar además el artículo que motiva su dirección); <span class="tag convencion">conv</span> constante matemática.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Parámetro</th><th class="num">Valor</th><th>Fuente</th></tr></thead>
+      <tbody>
+        {Object.entries(PARAMS).map(([k, p]) => (
+          <tr><td>{p.descripcion}<div class="hint mono">{k}</div></td><td class="num">{nf(p.valor)} {p.unidad}</td><td class="small"><span class="refs">{(p as Param).refs.map((r) => <span class={`tag ${claseRef(r)}`} title={ETIQUETA_REF[r]}>{r}</span>)}</span>{p.fuente}</td></tr>
+        ))}
+      </tbody>
+    </table></div>
+  </section>
+
+  <section class="doc-section">
+    <h2>Parámetros por alternativa</h2>
+    {LISTA_ALTERNATIVAS.map((a) => (
+      <details>
+        <summary>{a.id} · {a.nombre}</summary>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Parámetro</th><th class="num">Valor</th><th>Fuente</th></tr></thead>
+          <tbody>
+            {Object.entries(a.params).map(([k, p]) => (
+              <tr><td>{p.descripcion}<div class="hint mono">{k}</div></td><td class="num">{nf(p.valor)} {p.unidad}</td><td class="small"><span class="refs">{(p as Param).refs.map((r) => <span class={`tag ${claseRef(r)}`} title={ETIQUETA_REF[r]}>{r}</span>)}</span>{p.fuente}</td></tr>
+            ))}
+          </tbody>
+        </table></div>
+      </details>
+    ))}
+  </section>
+
+  <section class="doc-section card">
+    <h2>Supuestos</h2>
+    <ul class="tight">
+      <li>Llegadas Poisson e independientes.</li>
+      <li>Fallos independientes entre componentes.</li>
+      <li>Sin caché de rutas (la ráfaga de 30 trayectos distintos no pega en la caché de 5 minutos).</li>
+      <li>Red constante: un solo valor de latencia API ↔ base.</li>
+      <li>Los parámetros de sobrecarga de cada alternativa vienen de los artículos [1]–[4] o son supuestos del equipo; no se midieron en UrbanSafe.</li>
+      <li>La CPU de la base se reparte entre consultas (los inserts cortos no esperan detrás del cómputo de rutas).</li>
+      <li>La disponibilidad obligatoria se evalúa sobre la ruta síncrona crítica (ruteo). Las rutas de reporte y alertas se reportan aparte.</li>
+    </ul>
+  </section>
+
+  <section class="doc-section card">
+    <h2>Limitaciones</h2>
+    <ul class="tight">
+      <li><strong>No generalizar.</strong> Los resultados de los artículos [1]–[4] se obtuvieron en una sola máquina o en un entorno de prueba concreto; no se pueden extender sin más a UrbanSafe (Supabase en São Paulo, usuarios en Bogotá). Se usan para fijar la dirección y el orden de magnitud de las sobrecargas, no como predicción.</li>
+      <li>[1] mezcla arquitectura y despliegue (VM contra contenedores) y [2], [3] y [4] no incluyen una base remota; ninguno evalúa una arquitectura orientada a eventos (A4).</li>
+      <li>Es un modelo analítico en estado estable; las ráfagas se representan con un factor de pico y un tope de cola, no con una simulación en el tiempo.</li>
+      <li>La aproximación de Sakasegawa sobrestima la espera con ρ bajo y muchos servidores (la espera allí es despreciable) y es buena con ρ ≥ 0,7.</li>
+      <li>La base se modela como un solo conjunto de vCPU con réplica de lectura opcional; no se modelan bloqueos de filas ni el VACUUM.</li>
+      <li>El p95 combina la media del servicio con el cuantil de la espera: es una cota práctica, no la distribución exacta.</li>
+      <li>El puntaje de decisión es relativo (min-max entre las alternativas comparadas).</li>
+    </ul>
+  </section>
+
+  <section class="doc-section card">
+    <h2>Qué datos harían falta para validarlo en un entorno real</h2>
+    <ul class="tight">
+      <li>Pruebas de carga con k6 o JMeter sobre cada alternativa desplegada, con las mismas entradas del escenario.</li>
+      <li>Métricas de CPU y conexiones de Supabase (pg_stat_statements) para medir el servicio real por ruta e insert.</li>
+      <li>Trazas distribuidas (OpenTelemetry) para medir los saltos internos y el overhead de mTLS.</li>
+      <li>Mediciones de disponibilidad (tiempo de actividad) de cada componente durante varias semanas.</li>
+      <li>Facturas reales de los proveedores para calibrar los costos.</li>
+    </ul>
+  </section>
+  <section class="doc-section card" id="evidencia">
+    <h2>Evidencia de los artículos y cómo informa al modelo</h2>
+    {REFERENCIAS.map((r) => (
+      <div class="doc-section">
+        <h3><span class="tag literatura">{r.clave}</span> {ETIQUETA_REF[r.clave]}</h3>
+        <p><strong>Qué midió.</strong> {r.hallazgo}</p>
+        <p><strong>Cómo se usa en el modelo.</strong> {r.uso}</p>
+        <p class="muted"><strong>Cuidado.</strong> {r.cuidado}</p>
+      </div>
+    ))}
+  </section>
+
+  <section class="doc-section card" id="referencias">
+    <h2>Referencias</h2>
+    <ol class="refs-list">
+      {REFERENCIAS.map((r) => (<li><span class="key">{r.clave}</span><span>{r.cita}</span></li>))}
+      <li><span class="key">spec</span><span>{REF_SPEC.cita}</span></li>
+    </ol>
+    <p class="hint">Las fórmulas de colas M/M/c, la aproximación de Sakasegawa y la Ley de Escalabilidad Universal se nombran como métodos del modelo; no se usan como fuente de valores de parámetros.</p>
+  </section>
+</Base>
