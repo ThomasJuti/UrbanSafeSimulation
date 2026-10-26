@@ -1,0 +1,7 @@
+---
+import Base from '../layouts/Base.astro';
+import ResultsView from '../components/ResultsView';
+---
+<Base titulo="Resultados" descripcion="Indicadores calculados por el modelo para cada alternativa bajo el mismo escenario, con gráficos y la traza de cálculo paso a paso.">
+  <ResultsView client:only="react" />
+</Base>
